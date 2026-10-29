@@ -9,8 +9,9 @@ LG webOS and Samsung Tizen keep their upstream 1.3 behavior; the custom interfac
 
 - Nine app shortcuts visible together. Other TVs can still scroll to additional apps as upstream allows;
   low-memory TVs keep a nine-app cap. Existing shelf order and editing controls are retained.
-- Up reveals recommendations with a spring transition; Down returns to the app shelf and hides them.
-  The app shelf moves closer to the recommendation metadata while the cards are shown.
+- Recommendations stay visible while the app shelf is focused. Up and Down move focus between
+  recommendations and apps without clearing the scene or resetting the selected background palette.
+  The app shelf stays close to the recommendation metadata; the drawer and app-sheet transitions remain.
 - Fixed dark recommendation background with soft edge colors from the selected title. Palette changes
   crossfade, and late image loads retain the selected title instead of resetting to the first one.
   This is an on-screen effect, not control of physical Ambilight LEDs.
@@ -68,3 +69,12 @@ and the saver selector were checked visually. Both saver choices were verified t
 saved setting, ending with Google/Chromecast selected. No blanket compatibility or playback-performance
 improvement is claimed.
 The earlier installed APK and private configuration/key backup remain outside the repository.
+
+### Persistent recommendations (1.3-custom.2)
+
+Recommendations now remain visible when Down moves focus to the app shelf; the selected recommendation's
+palette remains unchanged. The drawer and All Apps transitions keep their existing behavior.
+The Android build, signature and complete project checks passed again. The navigation change was installed
+and visually tested on a second Philips Google TV running Android 14. Background sample pixels were
+unchanged before and after moving from a recommendation to the apps. The original Android 11 TV was not
+updated with this follow-up; its next device test remains subject to the owner's instruction.

@@ -2107,7 +2107,8 @@ final class HomeView extends ViewGroup implements Choreographer.FrameCallback, H
     /** Sets the springs' targets from the current focus (snap: no animation). */
     private void retarget(boolean snap) {
         revealShelf(snap);
-        float revealTarget = !sheetOpen && (!picksMode() || zone == Z_CARDS || zone == Z_TOP) ? 1 : 0;
+        // Moving focus to apps keeps the recommendation scene; only the app sheet hides it.
+        float revealTarget = sheetOpen ? 0 : 1;
         boolean revealChanged = recommendations.target != revealTarget;
         recommendations.target = revealTarget;
         if (snap) recommendations.snap(revealTarget);
