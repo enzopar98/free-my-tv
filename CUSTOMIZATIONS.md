@@ -76,5 +76,8 @@ Recommendations now remain visible when Down moves focus to the app shelf; the s
 palette remains unchanged. The drawer and All Apps transitions keep their existing behavior.
 The Android build, signature and complete project checks passed again. The navigation change was installed
 and visually tested on a second Philips Google TV running Android 14. Background sample pixels were
-unchanged before and after moving from a recommendation to the apps. The original Android 11 TV was not
-updated with this follow-up; its next device test remains subject to the owner's instruction.
+unchanged before and after moving from a recommendation to the apps. After the owner's subsequent approval,
+the original Android 11 TV was also updated to 1.3-custom.2 and passed the same navigation/background check.
+Free My TV was verified as the HOME handler on both devices, with the same nine shortcuts. Both retain their
+original Google screensaver, with a five-minute idle timeout; the Android 14 Google saver was observed starting
+on inactivity. Device addresses and private configuration are not published.
