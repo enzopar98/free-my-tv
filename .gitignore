@@ -17,3 +17,7 @@ __pycache__/
 # macOS
 .DS_Store
 tools/.i18n-cache.json
+
+# Private material stays outside the published variant
+.private/
+app/assets/personal-backgrounds/

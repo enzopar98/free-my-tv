@@ -419,13 +419,15 @@ final class HomeMode {
             Watchdog.clear(c);
             check(adb.shell("cmd package set-home-activity " + HOME_ACTIVITY), "Success",
                     Ui.tr("Android didn't accept the new home screen"));
-            if (Config.SCREENSAVER) adb.shell("settings put secure screensaver_components " + DREAM);
+            String selectedSaver = selectedScreensaver(adb, s);
+            if (!selectedSaver.isEmpty()) adb.shell("settings put secure screensaver_components '" + selectedSaver + "'");
             boolean jmOurs = !jm || setJmHome(adb, PKG);
             if (!jmOurs) AppLog.w("JmLauncher keeps the Home button: " + JM_HOME + " didn't take");
             JSONObject started = state(c);
             started.put("mode", FREE).put("homeReverted", false).put("setupHome", setupHome);
             save(c, started);
             List<String> targets = targets(home, dream, setupHome);
+            targets.removeIf(pkg -> saverDependency(pkg, selectedSaver));
             Set<String> disabled = new HashSet<>(stringList(state(c), "disabled"));
             Set<String> present = packages(adb, "");
             Set<String> keptOff = new HashSet<>(stringList(state(c), "keptOff"));
@@ -685,6 +687,7 @@ final class HomeMode {
             if (!FREE.equals(s.optString("mode")) || AMAZON) return;
             List<String> fixed = new ArrayList<>();
             try (Adb adb = Adb.connect(app, 10_000, null)) {
+                String selectedSaver = selectedScreensaver(adb, s);
                 try {   // as the widget says: a TV update can take it back, and a take-back can have failed
                     nowPlaying(app, adb, !s.optBoolean("homeReverted") && nowPlayingOn());
                 } catch (IOException e) {
@@ -720,13 +723,14 @@ final class HomeMode {
                 gone.removeAll(disabled);
                 wanted.removeAll(gone);
                 order.removeAll(gone);
-                // screensaver=false after a switch with ours: the TV's own screensaver app comes back on.
-                String dreamPkg = packageOf(dream);
-                if (!Config.SCREENSAVER && dreamPkg != null && disabled.remove(dreamPkg)) {
-                    wanted.remove(dreamPkg);
-                    order.remove(dreamPkg);
-                    if (disabledNow.remove(dreamPkg)) adb.shell("pm enable " + dreamPkg);
+                // Never disable the selected dream or Backdrop's recommendations dependency.
+                for (String pkg : new ArrayList<>(wanted)) if (saverDependency(pkg, selectedSaver)) {
+                    if (disabledNow.contains(pkg)) adb.shell("pm enable " + pkg);
+                    disabledNow.remove(pkg);
+                    disabled.remove(pkg);
+                    order.remove(pkg);
                 }
+                wanted.removeIf(pkg -> saverDependency(pkg, selectedSaver));
                 // Off before Free My TV: turned off again if a TV update brings one back, but never handed to
                 // Original to turn on.
                 List<String> keptOff = stringList(s, "keptOff");
@@ -792,13 +796,10 @@ final class HomeMode {
                     adb.shell("cmd package set-home-activity " + HOME_ACTIVITY);
                     fixed.add(Ui.tr("the home screen"));
                 }
-                // Whole component names: ".ScreensaverAlone" (Android 11 to 12L) contains ".Screensaver" (the others).
-                List<String> savers = Arrays.asList(adb.shell("settings get secure screensaver_components").trim().split(","));
-                if (Config.SCREENSAVER && !reverted && !savers.contains(DREAM)) {
-                    adb.shell("settings put secure screensaver_components " + DREAM);
-                    if (!savers.contains(OTHER_DREAM)) fixed.add(Ui.tr("the screensaver"));   // ours, moved: not the TV
-                } else if (!Config.SCREENSAVER && !reverted && (savers.contains(DREAM) || savers.contains(OTHER_DREAM))) {
-                    restoreScreensaver(adb, s);   // screensaver=false since the switch: the TV's own again
+                String currentSaver = safeComponents(adb.shell("settings get secure screensaver_components").trim());
+                if (!reverted && !selectedSaver.isEmpty() && !currentSaver.equals(selectedSaver)) {
+                    adb.shell("settings put secure screensaver_components '" + selectedSaver + "'");
+                    if (!currentSaver.equals(OTHER_DREAM)) fixed.add(Ui.tr("the screensaver"));
                 }
                 record(adb, disabled);
                 JSONObject latest = state(app);
@@ -815,6 +816,64 @@ final class HomeMode {
                 notice(app, Ui.tr("The TV was updated; Free My TV is still on."));
             }
         }
+    }
+
+    /** An explicit TV choice wins; otherwise retain upstream's screensaver=false behavior. */
+    private static String selectedScreensaver(Adb adb, JSONObject s) throws IOException {
+        String selected = safeComponents(s.optString("preferredScreensaver", ""));
+        if (selected.equals(OTHER_DREAM)) return DREAM;
+        if (!selected.isEmpty()) return selected;
+        if (Config.SCREENSAVER) return DREAM;
+        selected = safeComponents(adb.shell("settings get secure screensaver_components").trim());
+        if (!selected.isEmpty() && !selected.contains(PKG + "/")) return selected;
+        selected = safeComponents(s.optString("originalScreensaver", ""));
+        if (selected.isEmpty()) selected = originalDream(s);
+        if (selected.isEmpty()) selected = defaultDream(adb);
+        return selected;
+    }
+
+    /** Keep the selected dream and Backdrop's recommendations dependency enabled. */
+    private static boolean saverDependency(String pkg, String saver) {
+        if (pkg == null) return false;
+        for (String component : saver.split(",")) {
+            if (pkg.equals(packageOf(component)) || (component.startsWith("com.google.android.backdrop/")
+                    && pkg.equals(TV_RECOMMENDATIONS))) return true;
+        }
+        return false;
+    }
+
+    static void chooseScreensaver(Context context, boolean original) {
+        Context app = context.getApplicationContext();
+        new Thread(() -> {
+            synchronized (RUN) {
+                try (Adb adb = Adb.connect(app, 10_000, null)) {
+                    JSONObject latest = state(app);
+                    String selected = DREAM;
+                    if (original) {
+                        selected = safeComponents(latest.optString("originalScreensaver", ""));
+                        if (selected.isEmpty()) selected = originalDream(latest);
+                        if (selected.isEmpty()) selected = defaultDream(adb);
+                        if (selected.isEmpty()) throw new IOException(Ui.tr("ADB refused the command"));
+                    }
+                    for (String component : selected.split(",")) {
+                        // Enabling our own package can stop this process before the choice is saved.
+                        if (!PKG.equals(packageOf(component))) {
+                            check(adb.shell("pm enable " + packageOf(component)), "enabled", Ui.tr("ADB refused the command"));
+                        }
+                        if (component.startsWith("com.google.android.backdrop/")) adb.shell("pm enable " + TV_RECOMMENDATIONS);
+                    }
+                    adb.shell("settings put secure screensaver_components '" + selected + "'");
+                    if (!adb.shell("settings get secure screensaver_components").trim().equals(selected)) {
+                        throw new IOException(Ui.tr("ADB refused the command"));
+                    }
+                    latest.put("preferredScreensaver", selected);
+                    save(app, latest);
+                    notice(app, Ui.trf("Screensaver selected: {name}", "name", original ? Ui.tr("Original") : "Free My TV"));
+                } catch (Exception e) {
+                    notice(app, Ui.trf("Couldn't change the screensaver: {error}", "error", e.getMessage()));
+                }
+            }
+        }, "screensaver-choice").start();
     }
 
     /**

@@ -1,3 +1,5 @@
+> **Android customization based on 1.3:** see [CUSTOMIZATIONS.md](CUSTOMIZATIONS.md) for the nine-app shelf, animated recommendation reveal, ambient background, screensaver selector, and safe update instructions.
+
 <div align="center">
 
 <img src="docs/assets/icon-512.png" width="96" alt="">
