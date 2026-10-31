@@ -98,13 +98,19 @@ final class Backdrop {
             int[] glass = reduce(out, GW, GH, 2, 2);
             int[] lightGlass = whiten(glass.clone(), 0.74f);
             int[] night = darken(frost.clone(), 0.76f);
-            int[] nightGlass = darken(glass, 0.56f);
+            int[] nightGlass = darken(glass.clone(), 0.56f);
             if (own) {
                 int[] sharp = reduce(out, GW, GH, 1, 1);
                 int[] lightBg = ramp(sharp.clone(), 0.82f, 0.45f, true), nightBg = ramp(sharp, 0.76f, 0.5f, false);
                 out.recycle();
                 return new Backdrop(null, frost, null, wide, light, lightGlass, night, nightGlass, lightBg, nightBg, GW, GH);
             }
+            Bitmap glow = glow(glass);
+            glow.getPixels(night, 0, FW, 0, 0, FW, FH);
+            Bitmap reflected = Bitmap.createScaledBitmap(glow, GW, GH, true);
+            reflected.getPixels(nightGlass, 0, GW, 0, 0, GW, GH);
+            reflected.recycle();
+            glow.recycle();
             out.recycle();
             return new Backdrop(null, frost, null, wide, light, lightGlass, night, nightGlass);
         }
@@ -134,6 +140,47 @@ final class Backdrop {
         int[] frost = reduce(out, FW, FH, 3, 3);
         int[] glass = reduce(out, GW, GH, 2, 2);
         return new Backdrop(gpu(out), frost, glass, null, null, null, null, null);
+    }
+
+    /** Four soft color washes around a near-black center, derived from the recommendation palette. */
+    private static Bitmap glow(int[] pixels) {
+        Bitmap bitmap = Bitmap.createBitmap(FW, FH, Bitmap.Config.ARGB_8888);
+        Canvas canvas = new Canvas(bitmap);
+        canvas.drawColor(0xFF0A0B10);
+        Paint halo = new Paint(Paint.ANTI_ALIAS_FLAG | Paint.DITHER_FLAG);
+        float[][] spots = {{0, .5f}, {1, .5f}, {.5f, 0}, {.5f, 1}};
+        for (float[] spot : spots) {
+            // A plain RGB average turns almost every poster brown/gray. Pick its strongest
+            // chromatic hue instead; dark and neutral pixels contribute little to the palette.
+            double[] weights = new double[12], reds = new double[12], greens = new double[12], blues = new double[12];
+            float[] hsv = new float[3];
+            for (int y = 0; y < GH; y += 6) for (int x = 0; x < GW; x += 6) {
+                if (Math.abs(x / (float) GW - spot[0]) > .55f || Math.abs(y / (float) GH - spot[1]) > .55f) continue;
+                int color = pixels[y * GW + x];
+                android.graphics.Color.colorToHSV(color, hsv);
+                double weight = hsv[1] * hsv[1] * hsv[2];
+                int bin = Math.min(11, (int)(hsv[0] / 30));
+                weights[bin] += weight;
+                reds[bin] += ((color >> 16) & 255) * weight;
+                greens[bin] += ((color >> 8) & 255) * weight;
+                blues[bin] += (color & 255) * weight;
+            }
+            int best = 0;
+            for (int i = 1; i < weights.length; i++) if (weights[i] > weights[best]) best = i;
+            int color = 0xFF677385;
+            if (weights[best] > .01) color = android.graphics.Color.rgb((int)(reds[best] / weights[best]),
+                    (int)(greens[best] / weights[best]), (int)(blues[best] / weights[best]));
+            android.graphics.Color.colorToHSV(color, hsv);
+            hsv[1] = Math.max(.55f, hsv[1]); hsv[2] = .9f;
+            color = android.graphics.Color.HSVToColor(190, hsv);
+            halo.setShader(new android.graphics.RadialGradient(spot[0] * FW, spot[1] * FH, FW * .60f,
+                    new int[]{color, 0}, new float[]{0, 1}, Shader.TileMode.CLAMP));
+            canvas.drawRect(0, 0, FW, FH, halo);
+        }
+        halo.setShader(new android.graphics.RadialGradient(FW / 2f, FH / 2f, FW * .50f,
+                new int[]{0xFF0A0B10, 0xB00A0B10, 0}, new float[]{0, .35f, 1}, Shader.TileMode.CLAMP));
+        canvas.drawRect(0, 0, FW, FH, halo);
+        return bitmap;
     }
 
     /** How many times smaller the screensaver photo's frosted version is (the glass math uses the same number). */
