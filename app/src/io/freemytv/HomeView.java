@@ -1701,6 +1701,14 @@ final class HomeView extends ViewGroup implements Choreographer.FrameCallback, H
         } else {
             if (it.tile != null) roundImage(c, it.tile, it.tileShader, cell, r);
         }
+        if (fc > 0.01f) {
+            rim.setShader(null);
+            rim.setColor(Ui.alpha(0xFFFFFFFF, fc));
+            rim.setStrokeWidth(3 * k);
+            c.drawRoundRect(cell, r, r, rim);
+            rim.setStrokeWidth(2.5f * k);
+            rim.setColor(0xFFFFFFFF);
+        }
     }
 
     /**
@@ -3992,7 +4000,8 @@ final class HomeView extends ViewGroup implements Choreographer.FrameCallback, H
             sheen.setAlpha(alpha);
             c.drawRoundRect(tmp, r0, r0, sheen);
             sheen.setAlpha(255);
-            rim.setShader(lightRims[i]);
+            rim.setShader(null);
+            rim.setColor(0xFFFFFFFF);
             rim.setAlpha(alpha);
             rim.setStrokeWidth(2.5f * k / s);
             c.drawRoundRect(tmp, r0, r0, rim);
@@ -4045,8 +4054,14 @@ final class HomeView extends ViewGroup implements Choreographer.FrameCallback, H
                 c.drawText(label, x, r.bottom + (40 + 4 * f) * k, lTip);
             }
         }
-        if (sleepText.isEmpty()) return;
         float right = (lightButtons.isEmpty() ? CONTENT_R * k : topRects[3].left) - 28 * k, cy = L_BUTTON_CY * k;
+        if (!clockMode()) {
+            capsuleText.setColor(tone(L_INK, 0xF2FFFFFF));
+            float clockWidth = capsuleText.measureText(clockText);
+            c.drawText(clockText, right - clockWidth, cy + Ui.halfCap(capsuleText), capsuleText);
+            right -= clockWidth + 36 * k;
+        }
+        if (sleepText.isEmpty()) return;
         float tw = lQuote.measureText(sleepText), size = lQuote.getTextSize();
         c.drawText(sleepText, right - tw, cy + Ui.halfCap(lQuote), lQuote);
         Symbols.draw(getContext(), c, "bedtime", right - tw - size * 0.9f, cy, size, lQuote.getColor());
