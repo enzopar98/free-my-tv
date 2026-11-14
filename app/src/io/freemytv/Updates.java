@@ -80,7 +80,6 @@ final class Updates {
 
     /** The week's check, as a job that waits for the network and survives restarts (scheduled once). */
     static void schedule(Context c) {
-        if (!takesReleases(c)) return;
         JobScheduler scheduler = c.getSystemService(JobScheduler.class);
         if (scheduler == null || scheduler.getPendingJob(JOB) != null) return;
         PersistableBundle extras = new PersistableBundle();
@@ -174,12 +173,15 @@ final class Updates {
         JSONObject o = state(a);
         String v = o.optString("version");
         File told = new File(a.getFilesDir(), "update-told");
-        if (!ready(o, installedVersion(a)) || v.equals(text(told))) return;
+        boolean customAvailable = BUILD.equals(o.optString("state")) && compare(v, installedVersion(a)) > 0;
+        if ((!ready(o, installedVersion(a)) && !customAvailable) || v.equals(text(told))) return;
         try (OutputStream out = new FileOutputStream(told)) {
             out.write(v.getBytes(StandardCharsets.UTF_8));
         } catch (IOException ignored) {
         }
-        Toast.makeText(a, Ui.trf("Free My TV {version} is ready: Home Settings > Updates.", "version", v), Toast.LENGTH_LONG).show();
+        String notice = customAvailable ? Ui.trf("{version} is out: build it again", "version", v)
+                : Ui.trf("Free My TV {version} is ready: Home Settings > Updates.", "version", v);
+        Toast.makeText(a, notice, Toast.LENGTH_LONG).show();
     }
 
     // MARK: - Check and download

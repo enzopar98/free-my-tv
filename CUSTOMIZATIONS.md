@@ -1,6 +1,6 @@
 # Android 1.3 ambient-home variant
 
-This branch is based on upstream Free My TV 1.3, commit `aeffdb4c4faa781069ab5713890fa0b9efebb4ee`.
+This branch integrates upstream Free My TV 1.5, tag `v1.5.0`.
 It preserves upstream's features and safety checks while adapting the Android home screen.
 This is an independent customization, not an official release. The original license and credits apply.
 LG webOS and Samsung Tizen keep their upstream 1.3 behavior; the custom interface applies to Android.
@@ -46,10 +46,9 @@ git merge upstream/main
 adb install -r FreeMyTV.apk
 ```
 
-Upstream's release updater is retained unchanged. It installs official updates only in a generic build
-signed with the official release key. This self-built variant can manually check for newer official
-versions, but must be rebuilt to retain its modifications. It does not automatically replace itself
-with the official APK or fetch updates from this fork.
+The customized build checks upstream releases weekly and announces a newer version once. The official
+APK is signed with a different key, so a new release must be integrated, rebuilt and signed with the
+same private key before updating this installation. It does not install upstream APKs automatically.
 
 ## Privacy and distribution
 
